@@ -31,7 +31,7 @@ def test_get_page_schedual_dates(mock_page):
     page1.go_live_at.isoformat.return_value = "2025-09-22T10:00:00"
     page1.expire_at = None
     mock_page.objects.filter.return_value = [page1]
-    response = views.get_page_schedual_dates(request)
+    response = views.get_page_schedule_dates(request)
     assert response.status_code == 200
     import json
 
@@ -52,7 +52,7 @@ def test_update_page_schedual_date_success(mock_page):
     page = mock.Mock()
     page.title = "Test Page"
     mock_page.objects.get.return_value = page
-    response = views.update_page_schedual_date(request)
+    response = views.update_page_schedule_date(request)
     import json
 
     assert response.status_code == 200
@@ -64,5 +64,5 @@ def test_update_page_schedual_date_success(mock_page):
 def test_update_page_schedual_date_invalid_method():
     factory = RequestFactory()
     request = factory.get("/admin/publish-calendar/update-page-schedual-date/")
-    response = views.update_page_schedual_date(request)
+    response = views.update_page_schedule_date(request)
     assert response.status_code == 405
