@@ -1,11 +1,16 @@
+import datetime
+import logging
 from unittest import mock
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
+from django.utils import timezone
 
 from wagtail_publish_calendar import views
+from .utils import PageTestMixin
 
+logger = logging.getLogger(__name__)
 
 @pytest.mark.django_db
 def test_calendar_view_renders_template():
@@ -19,26 +24,28 @@ def test_calendar_view_renders_template():
 
 
 @pytest.mark.django_db
-@mock.patch("wagtail_publish_calendar.views.Page")
-def test_get_page_schedual_dates(mock_page):
-    factory = RequestFactory()
-    request = factory.get("/admin/publish-calendar/get-page-schedual-dates/")
-    # Setup mock pages
-    page1 = mock.Mock()
-    page1.id = 1
-    page1.title = "Test Page"
-    page1.go_live_at = mock.Mock()
-    page1.go_live_at.isoformat.return_value = "2025-09-22T10:00:00"
-    page1.expire_at = None
-    mock_page.objects.filter.return_value = [page1]
-    response = views.get_page_schedule_dates(request)
-    assert response.status_code == 200
-    import json
+class TestGetPageScheduleDates(PageTestMixin):
 
-    data = json.loads(response.content)
-    assert isinstance(data, list)
-    assert data[0]["title"] == "Test Page (Go-live)"
+    def test_get_page_schedule_dates(self):
+        factory = RequestFactory()
+        request = factory.get("/admin/publish-calendar/get-page-schedule-dates/")
+        live_data = timezone.now() + datetime.timedelta(days=5)
+        expiry_date =  timezone.now() + datetime.timedelta(days=15)
+        self.page.save_revision(approved_go_live_at=live_data)
+        self.page.expire_at =expiry_date
+        self.page.save()
+        response = views.get_page_schedule_dates(request)
+        assert response.status_code == 200
+        import json
 
+        data = json.loads(response.content)
+        assert isinstance(data, list)
+        assert data[1]["title"] == "{} (Go-live)".format(self.page.title)
+        assert data[0]["title"] == "{} (Expire)".format(self.page.title)
+        assert data[0]["start"] == expiry_date.isoformat()
+        assert data[1]["start"] == live_data.isoformat()
+        assert data[0]["id"] == "{}-end".format(self.page.id)
+        assert data[1]["id"] == "{}-start".format(self.page.id)
 
 @pytest.mark.django_db
 @mock.patch("wagtail_publish_calendar.views.Page")

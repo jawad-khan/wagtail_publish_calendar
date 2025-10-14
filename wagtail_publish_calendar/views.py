@@ -37,19 +37,14 @@ def get_page_schedule_dates(request):
     # 1. get all expired objects with live = True
     expired_qs = []
     for model in models:
-        expired_qs += [
-            model.objects.filter(live=True, expire_at__gt=timezone.now()).order_by(
-                "expire_at"
-            )
-        ]
+        expired_qs += [model.objects.filter(live=True, expire_at__gt=timezone.now())]
 
     events = []
     for queryset in expired_qs:
         for obj in queryset:
             events.append(get_expire_event(obj))
 
-    revisions = Revision.objects.filter(
-        approved_go_live_at__gt=timezone.now()).order_by("approved_go_live_at")
+    revisions = Revision.objects.filter(approved_go_live_at__gt=timezone.now())
     for event in revisions:
         events.append(get_publish_event(event))
 

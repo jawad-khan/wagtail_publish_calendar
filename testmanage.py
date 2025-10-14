@@ -7,7 +7,7 @@ from django.core.management import execute_from_command_line
 
 
 def main():
-    os.environ["DJANGO_SETTINGS_MODULE"] = "wagtail_publish_calendar.test.settings"
+    os.environ["DJANGO_SETTINGS_MODULE"] = "wagtail_publish_calendar.tests.settings"
     execute_from_command_line(sys.argv)
 
 
