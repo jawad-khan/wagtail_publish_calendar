@@ -16,9 +16,9 @@ export function localInputToIso(localValue) {
       throw new Error('Invalid local datetime format: ' + localValue);
     }
     // convert to UTC ISO
-    return new Date(localDate2.getTime() - localDate2.getTimezoneOffset() * 60000).toISOString();
+    return new Date(localDate2.getTime()).toISOString();
   }
-  return new Date(localDate.getTime() - localDate.getTimezoneOffset() * 60000).toISOString();
+  return new Date(localDate.getTime()).toISOString();
 }
 
 
