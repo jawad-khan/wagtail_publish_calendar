@@ -1,3 +1,7 @@
+"""
+AppConfig for wagtail_publish_calendar.
+"""
+
 from django.apps import AppConfig
 
 

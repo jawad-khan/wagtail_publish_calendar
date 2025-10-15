@@ -1,3 +1,7 @@
+"""
+Initialization for wagtail_publish_calendar.
+"""
+
 default_app_config = "wagtail_publish_calendar.apps.WagtailPublishCalendarAppConfig"
 
 

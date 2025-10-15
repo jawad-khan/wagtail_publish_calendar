@@ -1,3 +1,7 @@
+"""
+Views for wagtail_publish_calendar.
+"""
+
 import json
 
 from django.apps import apps
@@ -15,7 +19,7 @@ def calendar_view(request):
     Renders the main calendar view and form for the modal.
     """
     form = ScheduleForm()
-    context = {"form": form, "page_title": "Page Scheduler"}
+    context = {"form": form, "page_title": "Content Scheduler"}
     return render(
         request,
         "wagtail_publish_calendar/calendar.html",
@@ -25,7 +29,7 @@ def calendar_view(request):
 
 def get_page_schedule_dates(request):
     """
-    Creates event data with descriptive titles and color codes.
+    Creates event data for all expirable and schedulable Wagtail content types.
     """
     models = [Page]
     models += [
@@ -33,17 +37,13 @@ def get_page_schedule_dates(request):
         for model in apps.get_models()
         if issubclass(model, DraftStateMixin) and not issubclass(model, Page)
     ]
-
-    # 1. get all expired objects with live = True
     expired_qs = []
     for model in models:
         expired_qs += [model.objects.filter(live=True, expire_at__gt=timezone.now())]
-
     events = []
     for queryset in expired_qs:
         for obj in queryset:
             events.append(get_expire_event(obj))
-
     revisions = Revision.objects.filter(approved_go_live_at__gt=timezone.now())
     for event in revisions:
         events.append(get_publish_event(event))
@@ -52,6 +52,8 @@ def get_page_schedule_dates(request):
 
 
 def get_publish_event(event):
+    """Return event dict for a scheduled publish revision."""
+    page = event.page
     return {
         "id": f"{event.id}-start",
         "title": f"{event.object_str} (Go-live)",  # <-- COMBINED TITLE
@@ -62,6 +64,7 @@ def get_publish_event(event):
 
 
 def get_expire_event(event):
+    """Return event dict for an expiring object (any content type)."""
     revision = event.latest_revision
     return {
         "id": f"{revision.id}-end",
@@ -74,32 +77,31 @@ def get_expire_event(event):
 
 def update_page_schedule_date(request):
     """
-    Updates both go-live and expiry dates for a given page ID in a single
-    request.
+    Updates go-live and expiry dates for any supported Wagtail object via AJAX.
     """
     if request.method != "POST":
         return JsonResponse({"error": "Invalid method"}, status=405)
 
+    data = json.loads(request.body)
+    go_live_str = data.get("go_live_at")
+    expire_str = data.get("expire_at")
+    revision_id = data.get("page_id")
+
     try:
-        data = json.loads(request.body)
-        revision = Revision.objects.get(id=data.get("page_id"))
-
-        # A null or empty string from the frontend means the date should be cleared
-        go_live_str = data.get("go_live_at")
-        expire_str = data.get("expire_at")
-
-        revision.content_object.expire_at = parse_datetime(
-            expire_str) if expire_str else None
-        revision.content_object.save()
-
-        revision.approved_go_live_at = parse_datetime(
-            go_live_str) if go_live_str else None
+        revision = Revision.objects.get(id=revision_id)
+        revision.approved_go_live_at = parse_datetime(go_live_str) if go_live_str\
+            else None
         revision.save()
+
+        model = revision.content_object
+        model.expire_at = parse_datetime(expire_str) if expire_str else None
+        model.save()
+
 
         return JsonResponse({"status": "ok",
                              "message": f"Schedule for '{revision.object_str}' updated."})
 
-    except Page.DoesNotExist:
-        return JsonResponse({"error": "Page not found"}, status=404)
+    except Revision.DoesNotExist:
+        return JsonResponse({"error": "Event not found"}, status=404)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=400)

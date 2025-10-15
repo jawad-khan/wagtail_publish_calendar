@@ -1,3 +1,7 @@
+"""
+URL configuration for wagtail_publish_calendar.
+"""
+
 from django.urls import path
 
 from . import views
