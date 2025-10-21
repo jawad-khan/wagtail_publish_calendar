@@ -3,9 +3,11 @@
 {% block titletag %}{{ page_title }}{% endblock %}
 {% block content %}
     {% include "wagtailadmin/shared/header.html" with title=page_title icon="date" %}
-    <div id="calendar"
-         data-events-url="{% url "wagtail_publish_calendar:events_json" %}"
-         data-update-url="{% url "wagtail_publish_calendar:update_event" %}"></div>
+    <div class="nice-padding">
+        <div id="calendar"
+             data-events-url="{% url "wagtail_publish_calendar:events_json" %}"
+             data-update-url="{% url "wagtail_publish_calendar:update_event" %}"></div>
+    </div>
     <dialog id="event-modal"
             class="w-dialog"
             aria-labelledby="event-modal-title"
