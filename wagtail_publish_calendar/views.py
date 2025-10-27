@@ -43,27 +43,28 @@ def get_page_schedule_dates(request):
     events = []
     for queryset in expired_qs:
         for obj in queryset:
-            events.append(get_expire_event(obj))
+            events.append(get_expire_event(obj, request.user))
     revisions = Revision.objects.filter(approved_go_live_at__gt=timezone.now())
     for event in revisions:
-        events.append(get_publish_event(event))
+        events.append(get_publish_event(event, request.user))
 
     return JsonResponse(events, safe=False)
 
 
-def get_publish_event(event):
+def get_publish_event(event, user):
     """Return event dict for a scheduled publish revision."""
-    page = event.page
+    model = event.content_object
     return {
         "id": f"{event.id}-start",
         "title": f"{event.object_str} (Go-live)",  # <-- COMBINED TITLE
         "start": event.approved_go_live_at.isoformat(),
         "color": "#008352",
         "extendedProps": {"type": "start"},
+        "can_edit": model.permissions_for_user(user).can_publish()
     }
 
 
-def get_expire_event(event):
+def get_expire_event(event, user):
     """Return event dict for an expiring object (any content type)."""
     revision = event.latest_revision
     return {
@@ -72,6 +73,7 @@ def get_expire_event(event):
         "start": event.expire_at.isoformat(),
         "color": "#cd4444",
         "extendedProps": {"type": "end"},
+        "can_edit": event.permissions_for_user(user).can_publish()
     }
 
 

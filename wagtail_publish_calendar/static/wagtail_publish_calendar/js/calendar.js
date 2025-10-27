@@ -104,7 +104,18 @@ document.addEventListener('DOMContentLoaded', function () {
     // Use the fetchEvents service to load data
     events: (fetchInfo, successCallback, failureCallback) => {
       fetchEvents(eventsUrl)
-        .then(data => successCallback(data))
+        .then(data => {
+          // Map backend `can_edit` into FullCalendar's per-event `editable` flag
+          const transformed = (data || []).map(ev => {
+            // normalize can_edit (may be at top-level or inside extendedProps)
+            const canEdit = Boolean(ev.can_edit || (ev.extendedProps && ev.extendedProps.can_edit));
+            ev.editable = canEdit;
+            ev.extendedProps = ev.extendedProps || {};
+            ev.extendedProps.can_edit = canEdit;
+            return ev;
+          });
+          successCallback(transformed);
+        })
         .catch(err => {
           console.error('Failed to load events via service:', err);
           failureCallback(err);
@@ -114,6 +125,15 @@ document.addEventListener('DOMContentLoaded', function () {
     // EDIT an existing schedule by clicking an event
     eventClick: function (info) {
       info.jsEvent.preventDefault();
+
+      // Block click/edit for non-editable events
+      if (!info.event.extendedProps?.can_edit) {
+        // Non-editable — don't open modal. Optionally show a small message.
+        // You can replace this with a nicer UI notification if desired.
+        window.alert('You do not have permission to edit this event.');
+        return;
+      }
+
       const pageId = parseInt(info.event.id.split('-')[0]);
       if (isNaN(pageId)) return;
 
@@ -133,6 +153,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // UPDATE a schedule by dragging and dropping
     eventDrop: async function (info) {
+      // Prevent updates for non-editable events
+      if (!info.event.extendedProps?.can_edit) { info.revert(); return; }
+
       const pageId = parseInt(info.event.id.split('-')[0]);
       const droppedType = info.event.id.split('-')[1]; // 'start' or 'end'
       if (isNaN(pageId)) { info.revert(); return; }
@@ -161,6 +184,35 @@ document.addEventListener('DOMContentLoaded', function () {
         calendar.refetchEvents();
       } catch (err) {
         console.error('Event drop update failed:', err);
+        alert('Failed to update schedule. Reverting change.');
+        info.revert();
+      }
+    },
+
+    // Allow resizing updates (same protections as drop)
+    eventResize: async function (info) {
+      if (!info.event.extendedProps?.can_edit) { info.revert(); return; }
+
+      const pageId = parseInt(info.event.id.split('-')[0]);
+      if (isNaN(pageId)) { info.revert(); return; }
+
+      const allEvents = calendar.getEvents();
+      const goLiveEvent = allEvents.find(e => e.id === `${pageId}-start`);
+      const expireEvent = allEvents.find(e => e.id === `${pageId}-end`);
+
+      const goLiveDate = goLiveEvent ? goLiveEvent.start.toISOString() : null;
+      const expireDate = expireEvent ? expireEvent.start.toISOString() : null;
+
+      try {
+        const response = await fetch(updateUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+          body: JSON.stringify({ page_id: pageId, go_live_at: goLiveDate, expire_at: expireDate }),
+        });
+        if (!response.ok) throw new Error('Server responded with an error.');
+        calendar.refetchEvents();
+      } catch (err) {
+        console.error('Event resize update failed:', err);
         alert('Failed to update schedule. Reverting change.');
         info.revert();
       }
