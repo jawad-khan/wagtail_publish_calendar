@@ -89,11 +89,15 @@ def update_page_schedule_date(request):
 
     try:
         revision = Revision.objects.get(id=revision_id)
+        model = revision.content_object
+
+        if not model.permissions_for_user(request.user).can_publish():
+            return JsonResponse({"error": "Permission denied"}, status=403)
+
         revision.approved_go_live_at = parse_datetime(go_live_str) if go_live_str\
             else None
         revision.save()
 
-        model = revision.content_object
         model.expire_at = parse_datetime(expire_str) if expire_str else None
         model.save()
 
